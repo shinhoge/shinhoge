@@ -1,0 +1,122 @@
+; Tera Termマクロ
+
+; サーバーの接続情報を定義
+set servers [
+    [ "Server1", "username1", "password1" ]
+    [ "Server2", "username2", "password2" ]
+    [ "Server3", "username3", "password3" ]
+    ; 追加のサーバーをここに追記
+]
+
+; コマンドを実行する関数
+proc execute_command { ssh_handle command } {
+    ; コマンドを送信
+    ssh_send $ssh_handle "$command\r"
+    
+    ; コマンドの実行結果を待機
+    set result ""
+    set prompt "\[\r\n\]\$"
+    
+    while { 1 } {
+        set match [waitfor $ssh_handle $prompt]
+        set result "$result$match"
+        
+        if { [regexp $prompt $result] } {
+            break
+        }
+    }
+    
+    return $result
+}
+
+; メインの処理
+foreach server $servers {
+    set server_name [lindex $server 0]
+    set username [lindex $server 1]
+    set password [lindex $server 2]
+    
+    ; サーバーへのSSH接続
+    set ssh_handle [ssh_new]
+    set timeout 10
+    
+    if { [catch { ssh_open_session $ssh_handle $server_name } result] } {
+        puts "サーバー $server_name への接続に失敗しました。"
+        continue
+    }
+    
+    if { [catch { ssh_auth_password $ssh_handle $username $password } result] } {
+        puts "サーバー $server_name への認証に失敗しました。"
+        continue
+    }
+    
+    puts "サーバー $server_name に接続しました。"
+    
+    ; コマンドの実行
+    set output [execute_command $ssh_handle "ls -la"]
+    
+    ; 実行結果の表示
+    puts "サーバー $server_name の実行結果:"
+    puts $output
+    
+    ; SSHセッションの終了
+    ssh_close $ssh_handle
+}
+-------------------------------------
+
+; Tera Termマクロ
+
+; サーバーの接続情報を定義
+set servers [
+    [ "Server1", "username1", "password1", "/path/to/file1.txt", "local/path/to/save1.txt" ]
+    [ "Server2", "username2", "password2", "/path/to/file2.txt", "local/path/to/save2.txt" ]
+    [ "Server3", "username3", "password3", "/path/to/file3.txt", "local/path/to/save3.txt" ]
+    ; 追加のサーバーと保存先をここに追記
+]
+
+; ファイルを取得する関数
+proc get_file { ssh_handle remote_path local_path } {
+    ; ファイルをダウンロード
+    if { [catch { ssh_scp_get $ssh_handle $remote_path $local_path } result] } {
+        puts "ファイル $remote_path の取得に失敗しました。"
+        return 1
+    }
+    
+    return 0
+}
+
+; メインの処理
+foreach server $servers {
+    set server_name [lindex $server 0]
+    set username [lindex $server 1]
+    set password [lindex $server 2]
+    set remote_path [lindex $server 3]
+    set local_path [lindex $server 4]
+    
+    ; サーバーへのSSH接続
+    set ssh_handle [ssh_new]
+    set timeout 10
+    
+    if { [catch { ssh_open_session $ssh_handle $server_name } result] } {
+        puts "サーバー $server_name への接続に失敗しました。"
+        continue
+    }
+    
+    if { [catch { ssh_auth_password $ssh_handle $username $password } result] } {
+        puts "サーバー $server_name への認証に失敗しました。"
+        continue
+    }
+    
+    puts "サーバー $server_name に接続しました。"
+    
+    ; ファイルの取得
+    if { [get_file $ssh_handle $remote_path $local_path] } {
+        ; ファイルの取得に失敗した場合は次のサーバーへ
+        ssh_close $ssh_handle
+        continue
+    }
+    
+    puts "ファイル $remote_path を $local_path に保存しました。"
+    
+    ; SSHセッションの終了
+    ssh_close $ssh_handle
+}
